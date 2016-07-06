@@ -1,17 +1,54 @@
 import tensorflow as tf
 import nnet as nn
 import util as ut
+from time import time
+import numpy as np
 
-def make_binary_fitter(X, zdim, encoder_hdims, decoder_hdims):
+def init_binary_objective(X, zdim, encoder_hdims, decoder_hdims, callback=None):
     """ initializes VAE model that maps from a gaussian latent space to a
     binary vector whose values are all in [0, 1] """
     assert X.ndim==2
     N, xdim = X.shape
 
+    # initialize model params
     encoder_params, decoder_params, all_params = \
         init_binary_params(xdim, zdim, encoder_hdims, decoder_hdims)
+
+    # create the (monte carlo) evidence lower bound function
     vlb = make_binary_objective(encoder_params, decoder_params)
-    return encoder_params, decoder_params, all_params, vlb
+
+    # create a function that optimizes VLB
+    #fit = make_fitter(vlb, (encoder_params, decoder_params), X)
+    return encoder_params, decoder_params, vlb # fit
+
+
+def make_fitter(vlb, params, X, callback=None):
+    N, xdim = X.shape
+
+    def fit(num_epochs, minibatch_size, L, optimizer, sess):
+        num_batches = N // minibatch_size
+
+        # set up cost function and updates
+        x_batch    = tf.placeholder(tf.float32, shape=[minibatch_size, xdim], name='X')
+        cost       = -tf.reduce_sum(vlb(x_batch, N, minibatch_size, L))
+        train_step = optimizer.minimize(cost)
+
+        def train(idx):
+            xb = X[idx*minibatch_size:(idx+1)*minibatch_size]
+            train_step.run(feed_dict={x_batch: xb})
+            return cost.eval(feed_dict={x_batch: xb})
+
+        sess.run(tf.initialize_all_variables())
+        start = time()
+        for i in xrange(num_epochs):
+            vals = [train(bidx) for bidx in xrange(num_batches)]
+            print 'epoch {:>4} of {:>4}: {:> .6}'.format(i+1, num_epochs, np.median(vals[-10:]))
+
+        stop = time()
+        print 'cost {}, {} sec per update, {} sec total\n'.format(
+            np.median(vals[-10:]), (stop - start) / N, stop - start)
+
+    return fit
 
 
 ############################
@@ -110,9 +147,8 @@ def binary_decoder(decoder_params):
 #########################
 
 def binary_loglike(X, Y):
-    return -tf.reduce_sum(
-                (X-Y)**2.,
-                reduction_indices=1)
+    return -tf.reduce_sum( (X-Y)**2., reduction_indices=1)
+
 
 def gaussian_loglike(X, params):
     mu, log_sigmasq = params
