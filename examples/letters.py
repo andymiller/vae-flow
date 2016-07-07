@@ -12,12 +12,12 @@ viz.plot_random_examples(X, save=True)
 sess = tf.Session()
 
 # create encoder, decoder, and variational lower bound
-zdim = 20
+zdim = 100
 encode, decode, vlb = \
     vae.init_binary_objective(X    = X,
                               zdim = zdim,
-                              encoder_hdims = [200, 200],
-                              decoder_hdims = [200, 200])
+                              encoder_hdims = [500],
+                              decoder_hdims = [500])
 
 def callback(itr):
     def samplefun(num_samps):
@@ -42,9 +42,6 @@ fit = vae.make_fitter(vlb, X[:2000], callback)
 
 sess.run(tf.initialize_all_variables())
 
-fit(10, 50, 10, tf.train.AdamOptimizer(1e-4), sess)
-
-
-fit(3, 50, 10, tf.train.AdamOptimizer(1e-4), sess)
+fit(10, 50, 4, tf.train.GradientDescentOptimizer(1e-3), sess)
 fit(10, 50, 10, tf.train.AdamOptimizer(1e-4), sess)
 

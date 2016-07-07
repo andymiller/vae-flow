@@ -150,10 +150,10 @@ def binary_decoder(decoder_params):
 #########################
 
 def binary_loglike(X, p):
-    #return -tf.reduce_sum(tf.log(Y)*X + tf.log(1.-Y)*(1.-X),
-    #                      reduction_indices=1)
-    var = p * (1 - p)
-    return gaussian_loglike(X, (p, var))
+    return tf.reduce_sum(tf.log(p)*X + tf.log(1.-p)*(1.-X),
+                          reduction_indices=1)
+    #var = p * (1 - p)
+    #return gaussian_loglike(X, (p, var))
 
 
 def gaussian_loglike(X, params):
