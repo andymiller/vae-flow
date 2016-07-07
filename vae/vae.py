@@ -15,14 +15,13 @@ def init_binary_objective(X, zdim, encoder_hdims, decoder_hdims, callback=None):
         init_binary_params(xdim, zdim, encoder_hdims, decoder_hdims)
 
     # create the (monte carlo) evidence lower bound function
-    vlb = make_binary_objective(encoder_params, decoder_params)
+    vlb, encode, decode = make_binary_objective(encoder_params, decoder_params)
 
     # create a function that optimizes VLB
-    #fit = make_fitter(vlb, (encoder_params, decoder_params), X)
-    return encoder_params, decoder_params, vlb # fit
+    return encode, decode, vlb
 
 
-def make_fitter(vlb, params, X, callback=None):
+def make_fitter(vlb, X, callback=None):
     N, xdim = X.shape
 
     def fit(num_epochs, minibatch_size, L, optimizer, sess):
@@ -33,19 +32,23 @@ def make_fitter(vlb, params, X, callback=None):
         cost       = -tf.reduce_sum(vlb(x_batch, N, minibatch_size, L))
         train_step = optimizer.minimize(cost)
 
+        sess.run(tf.initialize_variables(ut.nontrainable_variables()))
+
         def train(idx):
             xb = X[idx*minibatch_size:(idx+1)*minibatch_size]
-            train_step.run(feed_dict={x_batch: xb})
-            return cost.eval(feed_dict={x_batch: xb})
+            train_step.run(feed_dict={x_batch: xb}, session=sess)
+            return cost.eval(feed_dict={x_batch: xb}, session=sess)
 
-        sess.run(tf.initialize_all_variables())
         start = time()
         for i in xrange(num_epochs):
             vals = [train(bidx) for bidx in xrange(num_batches)]
-            print 'epoch {:>4} of {:>4}: {:> .6}'.format(i+1, num_epochs, np.median(vals[-10:]))
+            print 'epoch {:>4} of {:>4}: {:> .6}' . \
+                    format(i+1, num_epochs, np.median(vals[-10:]))
+            if callback:
+                callback(i)
 
         stop = time()
-        print 'cost {}, {} sec per update, {} sec total\n'.format(
+        print 'cost {}, {:>5} sec per update, {:>5} sec total\n'.format(
             np.median(vals[-10:]), (stop - start) / N, stop - start)
 
     return fit
@@ -146,8 +149,11 @@ def binary_decoder(decoder_params):
 #  objective functions  #
 #########################
 
-def binary_loglike(X, Y):
-    return -tf.reduce_sum( (X-Y)**2., reduction_indices=1)
+def binary_loglike(X, p):
+    #return -tf.reduce_sum(tf.log(Y)*X + tf.log(1.-Y)*(1.-X),
+    #                      reduction_indices=1)
+    var = p * (1 - p)
+    return gaussian_loglike(X, (p, var))
 
 
 def gaussian_loglike(X, params):
@@ -183,11 +189,12 @@ def _make_objective(decoder, loglike):
             mu, log_sigmasq = encode(X)
             logpxz = sum(loglike(X, decode(sample_z(mu, log_sigmasq)))
                          for l in xrange(L)) / float(L)
+            print logpxz
 
             minibatch_val = -kl_to_prior(mu, log_sigmasq) + logpxz
 
             return minibatch_val / M  # NOTE: multiply by N for overall vlb
-        return vlb
+        return vlb, encode, decode
     return make_objective
 
 make_gaussian_objective = _make_objective(gaussian_decoder, gaussian_loglike)
