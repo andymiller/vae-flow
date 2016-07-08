@@ -5,19 +5,24 @@ from vae import vae, viz
 # load mnist letters
 from tensorflow.examples.tutorials.mnist import input_data
 mnist = input_data.read_data_sets('MNIST_data', one_hot=True)
-X     = mnist.test.images
+X     = mnist.train.images
+#Xtest = mnist.test.images[:3000,:]
 viz.plot_random_examples(X, save=True)
 
 # initialize session and vars
 sess = tf.Session()
 
 # create encoder, decoder, and variational lower bound
-zdim = 100
+zdim = 10
 encode, decode, vlb = \
     vae.init_binary_objective(X    = X,
                               zdim = zdim,
-                              encoder_hdims = [500],
-                              decoder_hdims = [500])
+                              encoder_hdims = [300],
+                              decoder_hdims = [300])
+
+Xtest = tf.constant(mnist.test.images)
+Ntest = len(mnist.test.images)
+test_lb_fun = vlb(Xtest, Ntest, Ntest, 5)
 
 def callback(itr):
     def samplefun(num_samps):
@@ -37,11 +42,14 @@ def callback(itr):
         imgs = decode(sample_z(mu, log_sigmasq, M=24)).eval(session=sess)
         return np.row_stack([subset, imgs])
     viz.plot_samples(itr, recons, savedir='vae_mnist_samples', stub='recon')
+    test_lb = test_lb_fun.eval(session=sess) * Ntest
 
-fit = vae.make_fitter(vlb, X[:2000], callback)
+    print "test data VLB: ", np.mean(test_lb)
 
+fit = vae.make_fitter(vlb, X, callback, load_data=False)
+
+## initialize variables and fit
 sess.run(tf.initialize_all_variables())
-
-fit(10, 50, 4, tf.train.GradientDescentOptimizer(1e-3), sess)
-fit(10, 50, 10, tf.train.AdamOptimizer(1e-4), sess)
+#fit(10, 50, 2, tf.train.AdamOptimizer(1e-3), sess)
+fit(200, 50, 2, tf.train.GradientDescentOptimizer(1e-3), sess)
 

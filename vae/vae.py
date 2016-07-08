@@ -1,8 +1,9 @@
 import tensorflow as tf
 import nnet as nn
 import util as ut
-from time import time
 import numpy as np
+from time import time
+import pyprind
 
 def init_binary_objective(X, zdim, encoder_hdims, decoder_hdims, callback=None):
     """ initializes VAE model that maps from a gaussian latent space to a
@@ -21,27 +22,43 @@ def init_binary_objective(X, zdim, encoder_hdims, decoder_hdims, callback=None):
     return encode, decode, vlb
 
 
-def make_fitter(vlb, X, callback=None):
+def make_fitter(vlb, X, callback=None, load_data=True):
     N, xdim = X.shape
+
+    # load all data onto the gpu at once... ideally
+    if load_data:
+        X_all = tf.constant(X, name='X')
 
     def fit(num_epochs, minibatch_size, L, optimizer, sess):
         num_batches = N // minibatch_size
 
         # set up cost function and updates
-        x_batch    = tf.placeholder(tf.float32, shape=[minibatch_size, xdim], name='X')
-        cost       = -tf.reduce_sum(vlb(x_batch, N, minibatch_size, L))
+        if load_data:
+            idx      = tf.placeholder(tf.int32, name='idx')
+            mbsize   = tf.constant(minibatch_size)
+            xdimsize = tf.constant(xdim)
+            x_batch  = tf.slice(X_all, [idx*mbsize, 0],
+                                       [mbsize,xdimsize], name='x_batch')
+        else:
+            x_batch  = tf.placeholder(tf.float32, shape=[minibatch_size, xdim],
+                                      name='X')
+        cost = -tf.reduce_sum(vlb(x_batch, N, minibatch_size, L))
         train_step = optimizer.minimize(cost)
 
         sess.run(tf.initialize_variables(ut.nontrainable_variables()))
 
-        def train(idx):
-            xb = X[idx*minibatch_size:(idx+1)*minibatch_size]
-            train_step.run(feed_dict={x_batch: xb}, session=sess)
-            return cost.eval(feed_dict={x_batch: xb}, session=sess)
+        def train(bidx):
+            if load_data:
+                train_step.run(feed_dict={idx:bidx}, session=sess)
+                return cost.eval(feed_dict={idx:bidx}, session=sess)
+            else:
+                xb = X[bidx*minibatch_size:(bidx+1)*minibatch_size]
+                train_step.run(feed_dict={x_batch: xb}, session=sess)
+                return cost.eval(feed_dict={x_batch: xb}, session=sess)
 
         start = time()
         for i in xrange(num_epochs):
-            vals = [train(bidx) for bidx in xrange(num_batches)]
+            vals = [train(bidx) for bidx in pyprind.prog_bar(xrange(num_batches))]
             print 'epoch {:>4} of {:>4}: {:> .6}' . \
                     format(i+1, num_epochs, np.median(vals[-10:]))
             if callback:
