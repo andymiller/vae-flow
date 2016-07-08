@@ -1,12 +1,14 @@
 import tensorflow as tf
 import numpy as np
-from vae import vae, viz
+from vae import vae, viz, data
 
-# load mnist letters
+# load binarized mnist
 from tensorflow.examples.tutorials.mnist import input_data
-mnist = input_data.read_data_sets('MNIST_data', one_hot=True)
-X     = mnist.train.images
-#Xtest = mnist.test.images[:3000,:]
+#mnist = input_data.read_data_sets('MNIST_data', one_hot=True)
+#X      = mnist.train.images
+bmnist = data.binarized_mnist()
+X       = bmnist[0]
+Xt      = bmnist[2]
 viz.plot_random_examples(X, save=True)
 
 # initialize session and vars
@@ -20,7 +22,8 @@ encode, decode, vlb = \
                               encoder_hdims = [300],
                               decoder_hdims = [300])
 
-Xtest = tf.constant(mnist.test.images)
+# test data as tensorflow constant
+Xtest = tf.constant(Xt)
 Ntest = len(mnist.test.images)
 test_lb_fun = vlb(Xtest, Ntest, Ntest, 5)
 
@@ -52,4 +55,3 @@ fit = vae.make_fitter(vlb, X, callback, load_data=False)
 sess.run(tf.initialize_all_variables())
 #fit(10, 50, 2, tf.train.AdamOptimizer(1e-3), sess)
 fit(200, 50, 2, tf.train.GradientDescentOptimizer(1e-3), sess)
-
