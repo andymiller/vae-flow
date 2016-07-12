@@ -23,6 +23,7 @@ def binarized_mnist_amat_to_numpy():
 if __name__ == '__main__':
 
     # download and convert to numpy arrays, pickle them
+    subdatasets = ['train', 'valid', 'test']
     for subdataset in subdatasets:
         filename = 'binarized_mnist_{}.amat'.format(subdataset)
         url = 'http://www.cs.toronto.edu/~larocheh/public/datasets/binarized_mnist/binarized_mnist_{}.amat'.format(subdataset)

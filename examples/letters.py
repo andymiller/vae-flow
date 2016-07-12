@@ -19,12 +19,12 @@ zdim = 10
 encode, decode, vlb = \
     vae.init_binary_objective(X    = X,
                               zdim = zdim,
-                              encoder_hdims = [300],
-                              decoder_hdims = [300])
+                              encoder_hdims = [500],
+                              decoder_hdims = [500])
 
 # test data as tensorflow constant
 Xtest = tf.constant(Xt)
-Ntest = len(mnist.test.images)
+Ntest = len(Xt)
 test_lb_fun = vlb(Xtest, Ntest, Ntest, 5)
 
 def callback(itr):
@@ -53,5 +53,10 @@ fit = vae.make_fitter(vlb, X, callback, load_data=False)
 
 ## initialize variables and fit
 sess.run(tf.initialize_all_variables())
-#fit(10, 50, 2, tf.train.AdamOptimizer(1e-3), sess)
-fit(200, 50, 2, tf.train.GradientDescentOptimizer(1e-3), sess)
+fit(10, 10, 1, tf.train.AdamOptimizer(1e-3), sess)
+fit(100, 50, 1, tf.train.AdamOptimizer(1e-3), sess)
+fit(100, 100, 1, tf.train.AdamOptimizer(1e-4), sess)
+
+#fit(100, 100, 1, tf.train.AdamOptimizer(1e-4), sess)
+
+#fit(20, 50, 10, tf.train.GradientDescentOptimizer(1e-3), sess)
