@@ -78,6 +78,16 @@ def kl_to_prior(mu, log_sigmasq):
     return -0.5*tf.reduce_sum(1. + log_sigmasq - mu**2. - tf.exp(log_sigmasq), 
                               reduction_indices=1)
 
+def normal_normal_kl(amu, alog_sigmasq, bmu, blog_sigmasq):
+    """ compute KL( N_a || N_b ) for two independent gaussian distributions
+    adopted from http://stats.stackexchange.com/questions/60680/kl-divergence-between-two-multivariate-gaussians
+    """
+    kls = blog_sigmasq - alog_sigmasq - 1. + \
+          tf.exp(alog_sigmasq - blog_sigmasq) + \
+          (bmu - amu)**2 * tf.exp(-blog_sigmasq)
+    return tf.reduce_sum(.5 * kls, reduction_indices=1)
+
+
 def make_vae_objective(encode, decode, zdim, loglike):
     def vlb(X, N, M, L):
         """ variational lower bound
@@ -101,32 +111,28 @@ def make_vae_objective(encode, decode, zdim, loglike):
     return vlb
 
 
-
 def make_aux_vae_objective(encode, aux_encode, aux_decode, decode, zdim, adim, loglike):
     def vlb(X, N, M, L):
-        def sample_z(mu, log_sigmasq):
-            eps = tf.random_normal((M, zdim), dtype=tf.float32)
+        def sample_normal(mu, log_sigmasq, dim):
+            eps = tf.random_normal((M, dim), dtype=tf.float32)
             return mu + tf.exp(0.5 * log_sigmasq) * eps
 
         # q(a | X) (aux encoder)
         amu, alog_sigmasq = aux_encode(X)
-        asamps            = sample_z(amu, alog_sigmasq)
+        asamps            = sample_normal(amu, alog_sigmasq, dim=adim)
 
         # q(z | a, x) (encoder)
         zmu, zlog_sigmasq = encode(tf.concat(1, [X, asamps]))
-        zsamps            = sample_z(zmu, zlog_sigmasq)
+        zsamps            = sample_normal(zmu, zlog_sigmasq, dim=zdim)
 
         # p(a | X, z) (aux decoder)
-        a = tf.concat(1, [X, zsamps])
         pamu, palog_sigmasq = aux_decode(tf.concat(1, [X, zsamps]))
 
         # p(X | z) (decoder)
-        logpxz = sum( loglike(X, decode(sample_z(zmu, zlog_sigmasq))) +
-                      gaussian_loglike(asamps, (pamu, palog_sigmasq))
-                      for l in xrange(L)) / float(L)
-
-        minibatch_val = -kl_to_prior(amu, alog_sigmasq) \
-                        -kl_to_prior(zmu, zlog_sigmasq) + logpxz
+        logpxz = sum(loglike(X, decode(zsamps)) for l in xrange(L)) / float(L)
+        minibatch_val = logpxz \
+                        -kl_to_prior(zmu, zlog_sigmasq) \
+                        -normal_normal_kl(amu, alog_sigmasq, pamu, palog_sigmasq)
 
         return minibatch_val / M
     return vlb

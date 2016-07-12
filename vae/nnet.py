@@ -31,7 +31,7 @@ def compose(layers):
 ### initialization
 
 def init_tensor(shape, name=None):
-    init = tf.random_normal(shape, stddev=.1, dtype=tf.float32)
+    init = tf.truncated_normal(shape, stddev=.1, dtype=tf.float32)
     return tf.Variable(init, name=name, dtype=np.float32)
 
 def init_layer(shape, layer, layer_name=""):

@@ -34,35 +34,33 @@ sess = tf.InteractiveSession()
 ##################################################################
 # forward, aux-forward, aux-recognition and z recognition models #
 ##################################################################
-zdim = 10
+zdim = 100
 adim = 10
 Xdim = X.shape[1]
 
 # z => X
-decoder_mlp_layers = [ (zdim, nnet.relu_layer),
-                       (200, nnet.stochastic_tanh_layer),
+decoder_mlp_layers = [ (zdim, nnet.tanh_layer),
                        (200, nnet.sigmoid_layer) ]
 decode, decoder_params = \
     nnet.make_mlp(layers = decoder_mlp_layers, out_dim = Xdim)
 
 # X, z => a
-aux_decoder_layers = [ (Xdim + zdim, nnet.relu_layer),
+aux_decoder_layers = [ (Xdim + zdim, nnet.tanh_layer),
                        (200, nnet.linear_layer, nnet.linear_layer) ]
 aux_decode, aux_decoder_params = \
     nnet.make_mlp(layers=aux_decoder_layers, out_dim = adim)
 
 # X => a
-aux_encoder_layers = [ (Xdim, nnet.relu_layer),
+aux_encoder_layers = [ (Xdim, nnet.tanh_layer),
                        (200, nnet.linear_layer, nnet.linear_layer) ]
 aux_encode, aux_encoder_params = \
     nnet.make_mlp(layers = aux_encoder_layers, out_dim = adim)
 
 # a, X => z
-encoder_layers = [ (Xdim + adim, nnet.relu_layer),
+encoder_layers = [ (Xdim + adim, nnet.tanh_layer),
                    (200, nnet.linear_layer, nnet.linear_layer) ]
 encode, encoder_params = \
     nnet.make_mlp(layers = encoder_layers, out_dim = zdim)
-
 
 
 #######################################
@@ -88,8 +86,9 @@ def callback(itr):
         return decode(z).eval(session=sess)
     viz.plot_samples(itr, samplefun, savedir='avae_mnist_samples')
 
-    def sample_z(mu, log_sigmasq, M=5):
-        eps = tf.random_normal((M, zdim), dtype=tf.float32)
+    def sample_normal(mu, log_sigmasq, M=5):
+        dim = mu.get_shape()[1].value
+        eps = tf.random_normal((M, dim), dtype=tf.float32)
         return mu + tf.exp(0.5 * log_sigmasq) * eps
 
     def recons(num_samps):
@@ -97,10 +96,10 @@ def callback(itr):
         subset = X[np.random.choice(X.shape[0], 1)]
         # compute encoder - first aux, then encoder conditioned on aux
         amu, alog_sigmasq = aux_encode(subset)
-        asamps            = sample_z(amu, alog_sigmasq, M=24)
+        asamps            = sample_normal(amu, alog_sigmasq, M=24)
         Xa                = tf.concat(1, [tf.tile(subset, [24, 1]),  asamps])
         zmu, zlog_sigmasq = encode(Xa)
-        imgs = decode(sample_z(zmu, zlog_sigmasq, M=24)).eval(session=sess)
+        imgs = decode(sample_normal(zmu, zlog_sigmasq, M=24)).eval(session=sess)
         return np.row_stack([subset, imgs])
 
     viz.plot_samples(itr, recons, savedir='avae_mnist_samples', stub='recon')
@@ -114,11 +113,8 @@ fit = vae.make_fitter(vlb, X, callback, load_data=False)
 
 ## initialize variables and fit
 sess.run(tf.initialize_all_variables())
-#fit(10, 10, 1, tf.train.AdamOptimizer(1e-3), sess)
 #fit(10, 50, 1, tf.train.GradientDescentOptimizer(1e-2), sess)
-fit(100, 50, 5, tf.train.AdamOptimizer(1e-4), sess)
+#fit(10, 10, 1, tf.train.AdamOptimizer(1e-3), sess)
+fit(10, 50, 1, tf.train.AdamOptimizer(1e-3), sess)
 fit(100, 100, 1, tf.train.AdamOptimizer(1e-4), sess)
 
-#fit(100, 100, 1, tf.train.AdamOptimizer(1e-4), sess)
-
-#
