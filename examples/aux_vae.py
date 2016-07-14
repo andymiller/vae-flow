@@ -124,3 +124,9 @@ fit(1000, 200, 1, tf.train.AdamOptimizer(3e-4), sess)
 # post expeirment evaluation
 # https://github.com/yburda/iwae/blob/master/experiments.py#L42
 
+#  project 
+saver = tf.train.Saver()
+save_path = saver.save(sess, "avae.ckpt")
+
+
+
