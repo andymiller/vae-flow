@@ -31,7 +31,7 @@ def compose(layers):
 ### initialization
 
 def init_tensor(shape, name=None):
-    init = tf.truncated_normal(shape, stddev=.1, dtype=tf.float32)
+    init = tf.truncated_normal(shape, stddev=.05, dtype=tf.float32)
     return tf.Variable(init, name=name, dtype=np.float32)
 
 def init_layer(shape, layer, layer_name=""):
@@ -60,7 +60,7 @@ numpy_sigmoid_layer = make_layer(np.dot, lambda x: 1./(1. + np.exp(-x)))
 numpy_linear_layer  = make_layer(np.dot, lambda x: x)
 
 
-### mlp-maker TODO FINISH OUTPUT
+### mlp-maker
 def make_mlp(layers, out_dim, out_layers=None):
     """
     Follows the convention: 

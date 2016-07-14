@@ -78,6 +78,13 @@ def kl_to_prior(mu, log_sigmasq):
     return -0.5*tf.reduce_sum(1. + log_sigmasq - mu**2. - tf.exp(log_sigmasq), 
                               reduction_indices=1)
 
+
+def natural_to_mean(natparams):
+     J, h = natparams
+     J = -2.*J
+     return h/J, T.log(1./J)
+
+
 def normal_normal_kl(amu, alog_sigmasq, bmu, blog_sigmasq):
     """ compute KL( N_a || N_b ) for two independent gaussian distributions
     adopted from http://stats.stackexchange.com/questions/60680/kl-divergence-between-two-multivariate-gaussians

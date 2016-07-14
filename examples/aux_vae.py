@@ -34,12 +34,14 @@ sess = tf.InteractiveSession()
 ##################################################################
 # forward, aux-forward, aux-recognition and z recognition models #
 ##################################################################
-zdim = 100
+zdim = 10
 adim = 10
 Xdim = X.shape[1]
 
 # z => X
 decoder_mlp_layers = [ (zdim, nnet.tanh_layer),
+                       (200, nnet.tanh_layer),
+                       #(500, nnet.stochastic_tanh_layer),
                        (200, nnet.sigmoid_layer) ]
 decode, decoder_params = \
     nnet.make_mlp(layers = decoder_mlp_layers, out_dim = Xdim)
@@ -58,6 +60,7 @@ aux_encode, aux_encoder_params = \
 
 # a, X => z
 encoder_layers = [ (Xdim + adim, nnet.tanh_layer),
+                   (200, nnet.tanh_layer),
                    (200, nnet.linear_layer, nnet.linear_layer) ]
 encode, encoder_params = \
     nnet.make_mlp(layers = encoder_layers, out_dim = zdim)
@@ -115,6 +118,9 @@ fit = vae.make_fitter(vlb, X, callback, load_data=False)
 sess.run(tf.initialize_all_variables())
 #fit(10, 50, 1, tf.train.GradientDescentOptimizer(1e-2), sess)
 #fit(10, 10, 1, tf.train.AdamOptimizer(1e-3), sess)
-fit(10, 50, 1, tf.train.AdamOptimizer(1e-3), sess)
-fit(100, 100, 1, tf.train.AdamOptimizer(1e-4), sess)
+fit(1000, 200, 1, tf.train.AdamOptimizer(3e-4), sess)
+
+
+# post expeirment evaluation
+# https://github.com/yburda/iwae/blob/master/experiments.py#L42
 
