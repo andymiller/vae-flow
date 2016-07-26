@@ -24,9 +24,9 @@ def plot_random_examples(x, save=True):
         plt.close(fig)
 
 
-def plot_samples(itr, samplefun, save=True, savedir='', stub=''):
+def plot_samples(itr, samplefun, save=True, savedir='', stub='', sidelen=5):
     fig = plt.figure()
-    plt.imshow(make_grid(5, samplefun(25)), cmap='gray')
+    plt.imshow(make_grid(sidelen, samplefun(sidelen*sidelen)), cmap='gray')
     if save:
         plt.savefig(os.path.join(savedir, '%ssamples_%03d.png' % (stub, itr)))
         print 'saved samples_%03d.png' % itr

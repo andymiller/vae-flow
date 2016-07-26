@@ -50,6 +50,9 @@ def make_fitter(vlb, X, callback=None, load_data=True):
             if callback:
                 callback(i)
 
+            # will tell you what nodes are being added
+            #tf.get_default_graph().finalize()
+
         stop = time()
         print 'cost {}, {:>5} sec per update, {:>5} sec total\n'.format(
             np.median(vals[-10:]), (stop - start) / N, stop - start)
@@ -83,6 +86,12 @@ def natural_to_mean(natparams):
      J, h = natparams
      J = -2.*J
      return h/J, T.log(1./J)
+
+
+def sample_normal(mu, log_sigmasq, nsamps):
+    dim = mu.get_shape()[1].value
+    eps = tf.random_normal((nsamps, dim), dtype=tf.float32)
+    return mu + tf.exp(0.5 * log_sigmasq) * eps
 
 
 def normal_normal_kl(amu, alog_sigmasq, bmu, blog_sigmasq):

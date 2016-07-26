@@ -30,14 +30,14 @@ def compose(layers):
 
 ### initialization
 
-def init_tensor(shape, name=None):
-    init = tf.truncated_normal(shape, stddev=.05, dtype=tf.float32)
+def init_tensor(shape, name=None, scale=.15):
+    init = tf.truncated_normal(shape, stddev=scale, dtype=tf.float32)
     return tf.Variable(init, name=name, dtype=np.float32)
 
-def init_layer(shape, layer, layer_name=""):
+def init_layer(shape, layer, layer_name="", scale=.15):
     if layer is not stochastic_tanh_layer:
-      return init_tensor(shape,      name="%s_W"%layer_name), \
-             init_tensor([shape[1]], name="%s_b"%layer_name)
+      return init_tensor(shape,      name="%s_W"%layer_name, scale=scale), \
+             init_tensor([shape[1]], name="%s_b"%layer_name, scale=scale)
     else:
       return init_stochastic_layer(shape, layer_name)
 
@@ -61,7 +61,7 @@ numpy_linear_layer  = make_layer(np.dot, lambda x: x)
 
 
 ### mlp-maker
-def make_mlp(layers, out_dim, out_layers=None):
+def make_mlp(layers, out_dim, out_layers=None, init_scale=.1):
     """
     Follows the convention: 
         Each layer in the MLP is specified (hidden-dim, layer-type)
@@ -75,13 +75,13 @@ def make_mlp(layers, out_dim, out_layers=None):
     hidden_dims    = [l[0] for l in layers]
     shapes         = zip(hidden_dims[:-1], hidden_dims[1:])
     hidden_nonlins = [l[1] for l in layers[:-1]]
-    hidden_params  = [init_layer(shape, l, layer_name="%d"%i)
+    hidden_params  = [init_layer(shape, l, layer_name="%d"%i, scale=init_scale)
                       for i, (shape, l) in enumerate(zip(shapes, hidden_nonlins))]
 
     # construct (potentially) multi-output layer
     out_nonlins = layers[-1][1:]
     out_shape   = (hidden_dims[-1], out_dim)
-    out_params  = [init_layer(out_shape, l, layer_name="out_%d"%i)
+    out_params  = [init_layer(out_shape, l, layer_name="out_%d"%i, scale=init_scale)
                    for i, l in enumerate(out_nonlins)]
 
     # string together hidden layers and output layer
