@@ -29,6 +29,47 @@ def load_binarized_mnist():
     Xt, Yt   = binarize(mnist.test.images), mnist.test.labels
     return (X, Y), (Xt, Yt)
 
+def make_eval_callback(sample_fun, recon_fun, latent_space_fun,
+                       test_vlb_fun, output_dir, sess):
+    """ create an evaluation callback function for training --- functions
+    passed in are:
+        sample_fun(num_samps):   returns num_samps x 784 array of samples
+                                 from prior
+        recon_fun(x, num_samps): returns num_samps x 784 array of
+                                 reconstructions from posterior over x
+                                 (single datum)
+        held_out_latent_space  : returns held out latent space z values
+
+    """
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+    import os
+    colors = sns.color_palette('muted', n_colors=10)
+    def callback(itr):
+
+        # plot samples from the model generative process
+        viz.plot_samples(itr, sample_fun, savedir=output_dir)
+
+        # plot reconstructed samples
+        viz.plot_samples(itr, recon_fun, savedir=output_dir, stub='recon')
+
+        # evaluate test 
+        test_lb = test_vlb_fun.eval(session=sess) * Ntest
+        print "test data VLB: ", np.mean(test_lb)
+
+        # plot z space for each test data item, colored by digit type
+        def plot_test_latent():
+            z = latent_space_fun()
+            fig = plt.figure()
+            ax  = plt.gca()
+            for i in xrange(10):
+                idx = np.argmax(Yt, 1) == i
+                ax.scatter(z[idx,0], z[idx,1], c=colors[i], label='%d'%i)
+            ax.legend()
+            fig.savefig(os.path.join(output_dir, "latent_space_%03d.png" % itr))
+        plot_test_latent()
+    return callback
+
 
 ######################################################################
 # Script params - if EVAL_MODEL is true, bypass training, load in
@@ -121,6 +162,27 @@ if __name__=="__main__":
         viz.plot_samples(itr, recons, savedir='avae_mnist_samples', stub='recon')
         test_lb = test_lb_fun.eval(session=sess) * Ntest
         print "test data VLB: ", np.mean(test_lb)
+
+        # plot z space for each test data item, colored by digit type
+        def plot_test_latent():
+            amu, alog_sigmasq = aux_encode(Xtest)
+            asamps            = sample_normal(amu, alog_sigmasq, M=1)
+            zmu, zlog_sigmasq = encode(tf.concat(1, [Xtest, asamps]))
+            z                 = sample_normal(zmu, zlog_sigmasq, M=1).eval(session=sess)
+            print z.shape
+            import matplotlib.pyplot as plt
+            fig = plt.figure()
+            ax  = plt.gca()
+            import seaborn as sns
+            colors = sns.color_palette('muted', n_colors=10)
+            for i in xrange(10):
+                idx = np.argmax(Yt, 1) == i
+                ax.scatter(z[idx,0], z[idx,1], c=colors[i], label='%d'%i)
+            ax.legend()
+            fig.savefig("avae_mnist_samples/latent_space_%03d.png" % itr)
+
+        plot_test_latent()
+
 
     ##########################################
     # Make gradient descent fitting function #

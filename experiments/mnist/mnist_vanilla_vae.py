@@ -57,20 +57,27 @@ if __name__=="__main__":
     test_vlb_fun = lambda: test_vlb.eval(session=sess) * Ntest
 
     # sample from prior function
-    nsamps = tf.placeholder(tf.int32, name='nsamps')
-    sfun = decode(tf.random_normal((nsamps, zdim), dtype=tf.float32))
-    def sample_fun(num_samps):
-        return sfun.eval(feed_dict={nsamps:num_samps}, session=sess)
+    def make_sample_fun():
+        nsamps = tf.placeholder(tf.int32, name='nsamps')
+        sfun = decode(tf.random_normal((nsamps, zdim), dtype=tf.float32))
+        def sample_fun(num_samps):
+            return sfun.eval(feed_dict={nsamps:num_samps}, session=sess)
+        return sample_fun
+    sample_fun = make_sample_fun()
 
     # reconstruction function
-    Xsub       = tf.placeholder(tf.float32, shape=[1, Xdim], name='Xsub')
-    zm, zls    = encode(Xsub)
-    recon_imgs = decode(vae.sample_normal(zm, zls, nsamps=nsamps-1))
-    def recon_fun(num_samps):
-        # choose one datapoint, encode it
-        subset = X[np.random.choice(X.shape[0], 1)]
-        imgs   = recon_imgs.eval(session=sess, feed_dict={Xsub: subset, nsamps:num_samps})
-        return np.row_stack([subset, imgs])
+    def make_recon_fun():
+        Xsub       = tf.placeholder(tf.float32, shape=[1, Xdim], name='Xsub')
+        nsamps = tf.placeholder(tf.int32, name='nsamps')
+        zm, zls    = encode(Xsub)
+        recon_imgs = decode(vae.sample_normal(zm, zls, nsamps=nsamps-1))
+        def recon_fun(num_samps):
+            # choose one datapoint, encode it
+            subset = X[np.random.choice(X.shape[0], 1)]
+            imgs   = recon_imgs.eval(session=sess, feed_dict={Xsub: subset, nsamps:num_samps})
+            return np.row_stack([subset, imgs])
+        return recon_fun
+    recon_fun = make_recon_fun()
 
     # encode test data into latent space
     zmu_test, zls_test = encode(Xtest)
@@ -92,7 +99,47 @@ if __name__=="__main__":
     if not EVAL_MODEL:
         ## initialize variables and fit
         sess.run(tf.initialize_all_variables())
-        fit(1000, 200, 1, tf.train.AdamOptimizer(3e-4), sess)
+        fit(100, 200, 1, tf.train.AdamOptimizer(3e-4), sess)
+
+        # save model
+        saver = tf.train.Saver()
+        saver.save(sess, "mnist_vae_z_%d.ckpt" % (zdim))
+
+        #########################################
+        # encode train data into latent space   #
+        #########################################
+        Xtrain = tf.placeholder(tf.float32, shape=X.shape, name='Xin')
+        zmu_train, zls_train = encode(Xtrain)
+        ztrain = vae.sample_normal(zmu_train, zls_train, nsamps=1)
+        zt = ztrain.eval(session=sess, feed_dict={Xtrain:X})
+
+        # fit a mixture model to zt, and sample from GMM prior
+        from sklearn.mixture import GMM
+        gmm = GMM(n_components=20, covariance_type='full')
+        gmm.fit(zt)
+
+        def make_gmm_sample_fun():
+            z_gmm    = tf.placeholder(tf.float32, shape=(None, zdim))
+            sfun_gmm = decode(z_gmm)
+            def gmm_sample_fun(num_samps):
+                return sfun_gmm.eval(feed_dict={z_gmm: gmm.sample(num_samps)}, session=sess)
+            return gmm_sample_fun
+        gmm_sample_fun = make_gmm_sample_fun()
+
+        viz.plot_samples(0, gmm_sample_fun, savedir=OUTPUT_DIR, stub='gmm_', sidelen=10)
+        viz.plot_samples(0, sample_fun, savedir=OUTPUT_DIR, stub='big_', sidelen=10)
+
+        import matplotlib.pyplot as plt
+        xg = yg = np.linspace(-3, 3, 100)
+        xx, yy = np.meshgrid(xg, yg)
+        fig = plt.figure(figsize=(8,8))
+        z = gmm.score(np.column_stack([xx.flatten(), yy.flatten()]))
+        plt.contourf(xx, yy, np.exp(z.reshape(xx.shape)))
+        import os
+        plt.savefig(os.path.join(OUTPUT_DIR, 'prob_z_gmm.png'))
+        plt.close("all")
+
+
 
     else:
         saver = tf.train.Saver()
