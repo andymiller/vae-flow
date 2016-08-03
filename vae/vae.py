@@ -22,8 +22,8 @@ def make_fitter(vlb, X, callback=None, load_data=True):
             idx      = tf.placeholder(tf.int32, name='idx')
             mbsize   = tf.constant(minibatch_size)
             xdimsize = tf.constant(xdim)
-            x_batch  = tf.slice(X_all, [idx*mbsize, 0],
-                                       [mbsize,xdimsize], name='x_batch')
+            x_batch  = tf.slice(X_all, tf.pack([idx*mbsize, 0]),
+                                       tf.pack([mbsize,xdimsize]), name='x_batch')
         else:
             x_batch  = tf.placeholder(tf.float32, shape=[minibatch_size, xdim],
                                       name='X')
@@ -90,7 +90,7 @@ def natural_to_mean(natparams):
 
 def sample_normal(mu, log_sigmasq, nsamps):
     dim = mu.get_shape()[1].value
-    eps = tf.random_normal((nsamps, dim), dtype=tf.float32)
+    eps = tf.random_normal(tf.pack([nsamps, dim]), dtype=tf.float32)
     return mu + tf.exp(0.5 * log_sigmasq) * eps
 
 
