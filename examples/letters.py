@@ -1,62 +1,65 @@
+"""
+Implements a variational autoencoder to learn a deep generative model 
+of MNIST digits, in the style of Kingma + Welling
+(https://arxiv.org/abs/1312.6114)
+"""
 import tensorflow as tf
 import numpy as np
-from vae import vae, viz, data
+from vae import vae, viz, data, nnet
 
-# load binarized mnist
+# load data
 from tensorflow.examples.tutorials.mnist import input_data
-#mnist = input_data.read_data_sets('MNIST_data', one_hot=True)
-#X      = mnist.train.images
-bmnist = data.binarized_mnist()
-X       = bmnist[0]
-Xt      = bmnist[2]
-viz.plot_random_examples(X, save=True)
+mnist  = input_data.read_data_sets('MNIST_data', one_hot=True)
+Xtrain = mnist.train.images
+Xtest  = mnist.test.images
+Xdim   = Xtrain.shape[1]
+viz.plot_random_examples(Xtrain, save=True)
 
-# initialize session and vars
-sess = tf.Session()
+# dimensionality of the latent space
+zdim = 2
 
-# create encoder, decoder, and variational lower bound
-zdim = 10
-encode, decode, vlb = \
-    vae.init_binary_objective(X    = X,
-                              zdim = zdim,
-                              encoder_hdims = [500],
-                              decoder_hdims = [500])
+# create tensorflow session scope
+with tf.Session() as sess:
 
-# test data as tensorflow constant
-Xtest = tf.constant(Xt)
-Ntest = len(Xt)
-test_lb_fun = vlb(Xtest, Ntest, Ntest, 5)
+    #################################
+    # specify model architecture    #
+    #################################
+    # create a MLP for the decoder (generative) model (z => X)
+    decoder_mlp_layers = [ (zdim, nnet.tanh_layer),
+                           (200, nnet.tanh_layer),
+                           (200, nnet.sigmoid_layer) ]
+    decode, decoder_params = \
+        nnet.make_mlp(layers=decoder_mlp_layers, out_dim=Xdim, init_scale=.11)
 
-def callback(itr):
-    def samplefun(num_samps):
-        import numpy as np
-        z = np.array(np.random.randn(num_samps, zdim), dtype=np.float32)
-        return decode(z).eval(session=sess)
-    viz.plot_samples(itr, samplefun, savedir='vae_mnist_samples')
+    # create a MLP for the encoder (recognition/inference model) (X => p(z))
+    encoder_layers = [ (Xdim, nnet.tanh_layer),
+                       (200, nnet.linear_layer, nnet.linear_layer) ]
+    encode, encoder_params = \
+        nnet.make_mlp(layers=encoder_layers, out_dim=zdim, init_scale=.11)
 
-    def sample_z(mu, log_sigmasq, M=5):
-        eps = tf.random_normal((M, zdim), dtype=tf.float32)
-        return mu + tf.exp(0.5 * log_sigmasq) * eps
+    ##########################################
+    # make variational lower bound objective #
+    ##########################################
+    vlb = vae.make_vae_objective(encode, decode, zdim, vae.binary_loglike)
 
-    def recons(num_samps):
-        # random subset
-        subset = X[np.random.choice(X.shape[0], 1)]
-        mu, log_sigmasq = encode(subset)
-        imgs = decode(sample_z(mu, log_sigmasq, M=24)).eval(session=sess)
-        return np.row_stack([subset, imgs])
-    viz.plot_samples(itr, recons, savedir='vae_mnist_samples', stub='recon')
-    test_lb = test_lb_fun.eval(session=sess) * Ntest
+    ######################################################
+    # specify validation and test functions for callback #
+    ######################################################
+    def make_callback():
+        Xtest_tf     = tf.constant(Xtest, dtype=tf.float32, shape=Xtest.shape)
+        Ntest        = len(Xtest)
+        test_vlb     = vlb(Xtest_tf, Ntest, Ntest, 5)
+        test_vlb_fun = lambda: test_vlb.eval(session=sess) * Ntest
+        def callback(itr):
+            print "  test vlb = %2.2f" % np.mean(test_vlb_fun())
 
-    print "test data VLB: ", np.mean(test_lb)
+    cb = make_callback()
 
-fit = vae.make_fitter(vlb, X, callback, load_data=False)
+    #########################################################
+    # Make inference function - and run with a tf optimizer #
+    #########################################################
+    fit = vae.make_fitter(vlb, Xtrain, callback=cb, load_data=True)
 
-## initialize variables and fit
-sess.run(tf.initialize_all_variables())
-fit(10, 10, 1, tf.train.AdamOptimizer(1e-3), sess)
-fit(100, 50, 1, tf.train.AdamOptimizer(1e-3), sess)
-fit(100, 100, 1, tf.train.AdamOptimizer(1e-4), sess)
-
-#fit(100, 100, 1, tf.train.AdamOptimizer(1e-4), sess)
-
-#fit(20, 50, 10, tf.train.GradientDescentOptimizer(1e-3), sess)
+    ## initialize variables and fit
+    sess.run(tf.initialize_all_variables())
+    fit(100, 200, 1, tf.train.AdamOptimizer(3e-4), sess)
