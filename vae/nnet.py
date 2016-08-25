@@ -61,7 +61,7 @@ numpy_linear_layer  = make_layer(np.dot, lambda x: x)
 
 
 ### mlp-maker
-def make_mlp(layers, out_dim, out_layers=None, init_scale=.1):
+def make_mlp(layers, out_dim, init_scale=.1):
     """
     Follows the convention: 
         Each layer in the MLP is specified (hidden-dim, layer-type)
