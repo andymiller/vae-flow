@@ -25,7 +25,13 @@ def make_stochastic_layer(dot, activation):
 
 
 def compose(layers):
-    return reduce(lambda f,g: lambda h: g(f(h)), layers, lambda x: x)
+    #return reduce(lambda f,g: lambda h: g(f(h)), layers, lambda x: x)
+    accum = lambda x: x
+    activation_list = []
+    for l in layers:
+        accum = lambda h: l(accum(h))
+        activation_list.append(lambda h: l(accum(h)))
+    return accum, activation_list
 
 
 ### initialization
