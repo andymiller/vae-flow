@@ -27,7 +27,7 @@ def make_fitter(vlb, X, callback=None, load_data=True):
         else:
             x_batch  = tf.placeholder(tf.float32, shape=[minibatch_size, xdim],
                                       name='X')
-        cost = -tf.reduce_sum(vlb(x_batch, N, minibatch_size, L))
+        cost = -tf.reduce_mean(vlb(x_batch, L)) * N
         train_step = optimizer.minimize(cost)
 
         sess.run(tf.initialize_variables(ut.nontrainable_variables()))
@@ -105,7 +105,10 @@ def normal_normal_kl(amu, alog_sigmasq, bmu, blog_sigmasq):
 
 
 def make_vae_objective(encode, decode, zdim, loglike):
-    def vlb(X, N, M, L):
+    """ returns a python function that takes in a Tensor (input data), and
+    returns a minibatch val tensor
+    """
+    def vlb(X, L):
         """ variational lower bound
             Args:
               - X : Nbatch x dimx data matrix
@@ -114,6 +117,7 @@ def make_vae_objective(encode, decode, zdim, loglike):
               - L : number of samples for monte carlo estimate
         """
         def sample_z(mu, log_sigmasq):
+            M   = tf.shape(mu)[0]
             eps = tf.random_normal((M, zdim), dtype=tf.float32)
             return mu + tf.exp(0.5 * log_sigmasq) * eps
 
@@ -123,7 +127,7 @@ def make_vae_objective(encode, decode, zdim, loglike):
 
         minibatch_val = -kl_to_prior(mu, log_sigmasq) + logpxz
 
-        return minibatch_val / M  # NOTE: multiply by N for overall vlb
+        return minibatch_val   # NOTE: multiply by N for overall vlb
     return vlb
 
 
