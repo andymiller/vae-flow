@@ -132,8 +132,9 @@ def make_vae_objective(encode, decode, zdim, loglike):
 
 
 def make_aux_vae_objective(encode, aux_encode, aux_decode, decode, zdim, adim, loglike):
-    def vlb(X, N, M, L):
+    def vlb(X, L):
         def sample_normal(mu, log_sigmasq, dim):
+            M   = tf.shape(mu)[0]
             eps = tf.random_normal((M, dim), dtype=tf.float32)
             return mu + tf.exp(0.5 * log_sigmasq) * eps
 
@@ -154,5 +155,5 @@ def make_aux_vae_objective(encode, aux_encode, aux_decode, decode, zdim, adim, l
                         -kl_to_prior(zmu, zlog_sigmasq) \
                         -normal_normal_kl(amu, alog_sigmasq, pamu, palog_sigmasq)
 
-        return minibatch_val / M
+        return minibatch_val
     return vlb

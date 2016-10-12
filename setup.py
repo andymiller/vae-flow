@@ -7,6 +7,6 @@ setup(name='vae-flow',
       author="Andy Miller",
       license="MIT",
       version='0.0.0',
-      packages=['vae-flow'],
+      packages=['vae'],
       ext_modules=[]
      )
