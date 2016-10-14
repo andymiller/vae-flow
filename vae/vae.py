@@ -66,8 +66,12 @@ def make_fitter(vlb, X, callback=None, load_data=True):
 def binary_loglike(X, p):
     return tf.reduce_sum(tf.log(p)*X + tf.log(1.-p)*(1.-X),
                           reduction_indices=1)
-    #var = p * (1 - p)
-    #return gaussian_loglike(X, (p, var))
+
+
+def binary_loglike_logit(X, logit_p):
+    """ more numerically safe version of above """
+    return -tf.reduce_sum(tf.nn.sigmoid_cross_entropy_with_logits(logit_p, X),
+                          reduction_indices=1)
 
 
 def gaussian_loglike(X, params):
