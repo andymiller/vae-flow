@@ -125,8 +125,8 @@ def make_vae_objective(encode, decode, zdim, loglike):
             eps = tf.random_normal((M, zdim), dtype=tf.float32)
             return mu + tf.exp(0.5 * log_sigmasq) * eps
 
-        mu, log_sigmasq = encode(X)
-        logpxz = sum(loglike(X, decode(sample_z(mu, log_sigmasq)))
+        mu, log_sigmasq = encode(X, reuse=True)
+        logpxz = sum(loglike(X, decode(sample_z(mu, log_sigmasq), reuse=True))
                      for l in xrange(L)) / float(L)
 
         minibatch_val = -kl_to_prior(mu, log_sigmasq) + logpxz
