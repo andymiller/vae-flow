@@ -19,6 +19,7 @@ viz.plot_random_examples(Xtrain, save=True)
 zdim = 2
 
 # create tensorflow session scope
+sess = tf.InteractiveSession()
 with tf.Session() as sess:
 
     #################################
@@ -48,7 +49,7 @@ with tf.Session() as sess:
     def make_callback():
         Xtest_tf     = tf.constant(Xtest, dtype=tf.float32, shape=Xtest.shape)
         Ntest        = len(Xtest)
-        test_vlb     = vlb(Xtest_tf, Ntest, Ntest, 5)
+        test_vlb     = vlb(Xtest_tf, 5)
         test_vlb_fun = lambda: test_vlb.eval(session=sess) * Ntest
         def callback(itr):
             print "  test vlb = %2.2f" % np.mean(test_vlb_fun())

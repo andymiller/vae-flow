@@ -112,7 +112,7 @@ def make_vae_objective(encode, decode, zdim, loglike):
     """ returns a python function that takes in a Tensor (input data), and
     returns a minibatch val tensor
     """
-    def vlb(X, L):
+    def vlb(X, L, alpha=1.):
         """ variational lower bound
             Args:
               - X : Nbatch x dimx data matrix
@@ -129,7 +129,7 @@ def make_vae_objective(encode, decode, zdim, loglike):
         logpxz = sum(loglike(X, decode(sample_z(mu, log_sigmasq), reuse=True))
                      for l in xrange(L)) / float(L)
 
-        minibatch_val = -kl_to_prior(mu, log_sigmasq) + logpxz
+        minibatch_val = -kl_to_prior(mu, log_sigmasq)*alpha + logpxz
 
         return minibatch_val   # NOTE: multiply by N for overall vlb
     return vlb
@@ -161,3 +161,33 @@ def make_aux_vae_objective(encode, aux_encode, aux_decode, decode, zdim, adim, l
 
         return minibatch_val
     return vlb
+
+
+def make_vimco_objective(encode, decode, zdim, loglike):
+    """ returns a python function that takes in a Tensor (input data), and
+    returns a minibatch val tensor
+    """
+    def vlb(X, L, alpha=1.):
+        """ variational lower bound
+            Args:
+              - X : Nbatch x dimx data matrix
+              - N : total number of data (for overall scale)
+              - M : Minibatch Size
+              - L : number of samples for monte carlo estimate
+        """
+        def sample_z(mu, log_sigmasq):
+            M   = tf.shape(mu)[0]
+            eps = tf.random_normal((M, zdim), dtype=tf.float32)
+            return mu + tf.exp(0.5 * log_sigmasq) * eps
+
+        mu, log_sigmasq = encode(X, reuse=True)
+        logpxz = sum(loglike(X, decode(sample_z(mu, log_sigmasq), reuse=True))
+                     for l in xrange(L)) / float(L)
+
+        minibatch_val = -kl_to_prior(mu, log_sigmasq)*alpha + logpxz
+
+        return minibatch_val   # NOTE: multiply by N for overall vlb
+    return vlb
+
+
+
